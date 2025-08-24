@@ -165,6 +165,37 @@ class MetachatMeeting {
         });
     }
     
+    updateUIButtonStates(prefix) {
+        // Update microphone button
+        const micBtn = document.getElementById(`${prefix}MicBtn`);
+        const micImg = micBtn.querySelector('img');
+        
+        if (this.isMicOn) {
+            micBtn.className = 'control-btn mic-on';
+            micImg.src = 'icons/mic-on.png';
+        } else {
+            micBtn.className = 'control-btn mic-off';
+            micImg.src = 'icons/mic-off.png';
+        }
+        
+        // Update camera button
+        const camBtn = document.getElementById(`${prefix}CamBtn`);
+        const camImg = camBtn.querySelector('img');
+        
+        if (this.isCamOn) {
+            camBtn.className = 'control-btn cam-on';
+            camImg.src = 'icons/cam-on.png';
+        } else {
+            camBtn.className = 'control-btn cam-off';
+            camImg.src = 'icons/cam-off.png';
+        }
+        
+        // Update screen share button (only in meeting)
+        if (prefix === 'meeting') {
+            this.updateScreenShareButton();
+        }
+    }
+    
     async setupLobbyEvents() {
         // Name input
         const nameInput = document.getElementById('nameInput');
@@ -179,6 +210,9 @@ class MetachatMeeting {
         
         // Media controls in lobby
         this.setupMediaControls('lobby');
+        
+        // Sync UI button states with internal state
+        this.updateUIButtonStates('lobby');
         
         // Initialize with microphone only (camera off by default)
         this.updateLocalStream();
@@ -503,6 +537,9 @@ class MetachatMeeting {
         
         // Setup meeting controls
         this.setupMediaControls('meeting');
+        
+        // Sync UI button states with internal state
+        this.updateUIButtonStates('meeting');
         
         // Connect to signaling server
         this.socket = io();
