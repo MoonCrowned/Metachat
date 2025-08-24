@@ -571,6 +571,18 @@ class MetachatMeeting {
         
         // Add local participant tile
         this.addLocalParticipantTile();
+        
+        // Update grid layout after DOM is rendered
+        setTimeout(() => {
+            this.updateGridLayout();
+        }, 100);
+        
+        // Add resize listener for responsive grid
+        window.addEventListener('resize', () => {
+            if (this.isInMeeting) {
+                this.updateGridLayout();
+            }
+        });
     }
     
     addLocalParticipantTile() {
@@ -876,19 +888,63 @@ class MetachatMeeting {
         }
     }
     
+    calculateOptimalGrid(participantCount, containerWidth, containerHeight) {
+        if (participantCount === 0) return { cols: 1, rows: 1, tileSize: 0 };
+        
+        let bestConfig = { cols: 1, rows: 1, tileSize: 0 };
+        
+        // Try different grid configurations
+        for (let cols = 1; cols <= participantCount; cols++) {
+            const rows = Math.ceil(participantCount / cols);
+            
+            // Calculate maximum tile size for this configuration
+            const maxTileWidth = (containerWidth - 16) / cols - 8; // Account for padding and gaps
+            const maxTileHeight = (containerHeight - 16) / rows - 8;
+            const tileSize = Math.min(maxTileWidth, maxTileHeight);
+            
+            // Skip if tiles would be too small or negative
+            if (tileSize <= 0) continue;
+            
+            // This configuration is better if tiles are larger
+            if (tileSize > bestConfig.tileSize) {
+                bestConfig = { cols, rows, tileSize };
+            }
+        }
+        
+        return bestConfig;
+    }
+    
     updateGridLayout() {
         const participantsGrid = document.getElementById('participantsGrid');
         const participantCount = participantsGrid.children.length;
         
-        // Remove all grid classes
+        if (participantCount === 0) return;
+        
+        // Get container dimensions
+        const containerWidth = participantsGrid.clientWidth;
+        const containerHeight = participantsGrid.clientHeight;
+        
+        // Calculate optimal grid
+        const { cols, rows, tileSize } = this.calculateOptimalGrid(participantCount, containerWidth, containerHeight);
+        
+        // Remove all existing grid classes
         participantsGrid.className = 'participants-grid';
         
-        // Add appropriate grid class
-        if (participantCount <= 9) {
-            participantsGrid.classList.add(`grid-${participantCount}`);
-        } else {
-            participantsGrid.classList.add('grid-9');
-        }
+        // Apply dynamic grid styling
+        participantsGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        participantsGrid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        participantsGrid.style.placeItems = 'center';
+        
+        // Apply tile size to all participant tiles
+        const tiles = participantsGrid.querySelectorAll('.participant-tile');
+        tiles.forEach(tile => {
+            tile.style.width = `${tileSize}px`;
+            tile.style.height = `${tileSize}px`;
+            tile.style.maxWidth = `${tileSize}px`;
+            tile.style.maxHeight = `${tileSize}px`;
+        });
+        
+        console.log(`Grid: ${cols}×${rows}, tile size: ${Math.round(tileSize)}px, participants: ${participantCount}`);
     }
     
     toggleFullscreen(peerId, stream) {
