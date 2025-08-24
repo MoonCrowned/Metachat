@@ -577,10 +577,25 @@ class MetachatMeeting {
             this.updateGridLayout();
         }, 100);
         
+        // Add click handler to fullscreen video for exiting fullscreen
+        const fullscreenVideo = document.getElementById('fullscreenVideo');
+        fullscreenVideo.addEventListener('click', () => {
+            if (this.isFullscreen) {
+                this.toggleFullscreen(null, null);
+            }
+        });
+        
         // Add resize listener for responsive grid
         window.addEventListener('resize', () => {
             if (this.isInMeeting) {
                 this.updateGridLayout();
+            }
+        });
+        
+        // Add escape key listener for exiting fullscreen
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.isFullscreen) {
+                this.toggleFullscreen(null, null);
             }
         });
     }
@@ -959,9 +974,15 @@ class MetachatMeeting {
             const videoElement = fullscreenVideo.querySelector('.fullscreen-video-element');
             videoElement.srcObject = stream;
             
-            const participant = this.participants.get(peerId);
             const nameElement = fullscreenVideo.querySelector('.participant-name');
-            nameElement.textContent = participant ? participant.userName : 'Unknown';
+            
+            // Handle local participant vs remote participant
+            if (peerId === 'local') {
+                nameElement.textContent = this.userName + ' (Вы)';
+            } else {
+                const participant = this.participants.get(peerId);
+                nameElement.textContent = participant ? participant.userName : 'Unknown';
+            }
             
             fullscreenVideo.classList.remove('hidden');
             participantsGrid.style.display = 'none';
@@ -969,6 +990,10 @@ class MetachatMeeting {
             // Exit fullscreen
             this.isFullscreen = false;
             this.fullscreenPeerId = null;
+            
+            // Stop the video element
+            const videoElement = fullscreenVideo.querySelector('.fullscreen-video-element');
+            videoElement.srcObject = null;
             
             fullscreenVideo.classList.add('hidden');
             participantsGrid.style.display = 'grid';
