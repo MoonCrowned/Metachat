@@ -292,6 +292,11 @@ class MetachatMeeting {
             
             await this.updateLocalStream();
             
+            // Update local participant tile if in meeting
+            if (this.isInMeeting) {
+                this.updateLocalParticipantTile();
+            }
+            
         } finally {
             this.isUpdatingMicrophone = false;
         }
@@ -402,6 +407,9 @@ class MetachatMeeting {
                 // Replace video track in all peer connections
                 this.replaceVideoTrack(this.screenStream.getVideoTracks()[0]);
                 
+                // Update local participant tile
+                this.updateLocalParticipantTile();
+                
                 // Listen for screen share end
                 this.screenStream.getVideoTracks()[0].addEventListener('ended', () => {
                     this.stopScreenShare();
@@ -433,6 +441,9 @@ class MetachatMeeting {
         } else {
             this.replaceVideoTrack(null);
         }
+        
+        // Update local participant tile
+        this.updateLocalParticipantTile();
     }
     
     updateScreenShareButton() {
@@ -525,6 +536,11 @@ class MetachatMeeting {
             // Update local video display
             this.updateLocalVideoDisplay();
             
+            // Update local participant tile if in meeting
+            if (this.isInMeeting) {
+                this.updateLocalParticipantTile();
+            }
+            
         } catch (error) {
             console.error('Error updating local stream:', error);
             // Ensure video display is updated even on error
@@ -552,6 +568,133 @@ class MetachatMeeting {
         });
         
         this.showMeetingScreen();
+        
+        // Add local participant tile
+        this.addLocalParticipantTile();
+    }
+    
+    addLocalParticipantTile() {
+        const participantsGrid = document.getElementById('participantsGrid');
+        
+        // Create local participant tile
+        const tile = document.createElement('div');
+        tile.className = 'participant-tile';
+        tile.id = 'participant-local';
+        
+        if (this.isCamOn && this.localStream) {
+            // Video available - show video stream
+            const video = document.createElement('video');
+            video.className = 'participant-video';
+            video.srcObject = this.localStream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true; // Always mute local video to prevent feedback
+            tile.appendChild(video);
+            
+            // Name overlay
+            const nameOverlay = document.createElement('div');
+            nameOverlay.className = 'participant-name-overlay';
+            nameOverlay.textContent = this.userName + ' (Вы)';
+            tile.appendChild(nameOverlay);
+        } else if (this.isScreenSharing && this.screenStream) {
+            // Screen sharing - show screen stream
+            const video = document.createElement('video');
+            video.className = 'participant-video';
+            video.srcObject = this.screenStream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            tile.appendChild(video);
+            
+            // Name overlay
+            const nameOverlay = document.createElement('div');
+            nameOverlay.className = 'participant-name-overlay';
+            nameOverlay.textContent = this.userName + ' (Вы)';
+            tile.appendChild(nameOverlay);
+        } else {
+            // No video - show name only
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'participant-name-large';
+            nameDiv.textContent = this.userName + ' (Вы)';
+            tile.appendChild(nameDiv);
+        }
+        
+        // Muted indicator if microphone is off
+        if (!this.isMicOn) {
+            const mutedIndicator = document.createElement('div');
+            mutedIndicator.className = 'participant-muted';
+            mutedIndicator.innerHTML = '<img src="icons/mic-off.png" alt="Muted">';
+            tile.appendChild(mutedIndicator);
+        }
+        
+        // Click handler for fullscreen
+        tile.addEventListener('click', () => {
+            if (this.isCamOn || this.isScreenSharing) {
+                const stream = this.isScreenSharing ? this.screenStream : this.localStream;
+                this.toggleFullscreen('local', stream);
+            }
+        });
+        
+        participantsGrid.appendChild(tile);
+        
+        // Update grid layout
+        this.updateGridLayout();
+    }
+    
+    updateLocalParticipantTile() {
+        const localTile = document.getElementById('participant-local');
+        if (!localTile) {
+            return; // Local tile doesn't exist yet
+        }
+        
+        // Remove old content
+        localTile.innerHTML = '';
+        
+        if (this.isCamOn && this.localStream) {
+            // Video available - show video stream
+            const video = document.createElement('video');
+            video.className = 'participant-video';
+            video.srcObject = this.localStream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            localTile.appendChild(video);
+            
+            // Name overlay
+            const nameOverlay = document.createElement('div');
+            nameOverlay.className = 'participant-name-overlay';
+            nameOverlay.textContent = this.userName + ' (Вы)';
+            localTile.appendChild(nameOverlay);
+        } else if (this.isScreenSharing && this.screenStream) {
+            // Screen sharing - show screen stream
+            const video = document.createElement('video');
+            video.className = 'participant-video';
+            video.srcObject = this.screenStream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            localTile.appendChild(video);
+            
+            // Name overlay
+            const nameOverlay = document.createElement('div');
+            nameOverlay.className = 'participant-name-overlay';
+            nameOverlay.textContent = this.userName + ' (Вы)';
+            localTile.appendChild(nameOverlay);
+        } else {
+            // No video - show name only
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'participant-name-large';
+            nameDiv.textContent = this.userName + ' (Вы)';
+            localTile.appendChild(nameDiv);
+        }
+        
+        // Muted indicator if microphone is off
+        if (!this.isMicOn) {
+            const mutedIndicator = document.createElement('div');
+            mutedIndicator.className = 'participant-muted';
+            mutedIndicator.innerHTML = '<img src="icons/mic-off.png" alt="Muted">';
+            localTile.appendChild(mutedIndicator);
+        }
     }
     
     setupSocketEvents() {
@@ -728,7 +871,7 @@ class MetachatMeeting {
         this.updateGridLayout();
         
         // Exit fullscreen if this was the fullscreen participant
-        if (this.isFullscreen && this.fullscreenPeerId === peerId) {
+        if (this.isFullscreen && (this.fullscreenPeerId === peerId || this.fullscreenPeerId === 'local')) {
             this.toggleFullscreen(null, null);
         }
     }
@@ -781,6 +924,12 @@ class MetachatMeeting {
         this.peers.forEach(peer => peer.destroy());
         this.peers.clear();
         this.participants.clear();
+        
+        // Remove local participant tile
+        const localTile = document.getElementById('participant-local');
+        if (localTile) {
+            localTile.remove();
+        }
         
         // Stop local streams
         if (this.localStream) {
