@@ -21,6 +21,10 @@ class MetachatMeeting {
         this.isUpdatingCamera = false;
         this.isUpdatingMicrophone = false;
         
+        // Separate audio and video streams
+        this.audioStream = null;
+        this.videoStream = null;
+        
         // Device lists
         this.audioInputDevices = [];
         this.videoInputDevices = [];
@@ -125,23 +129,23 @@ class MetachatMeeting {
         // Update lobby device lists
         this.populateDeviceList('lobbyMicDevices', this.audioInputDevices, this.currentAudioDevice, async (deviceId) => {
             this.currentAudioDevice = deviceId;
-            await this.updateLocalStream();
+            await this.updateAudioStream();
         });
         
         this.populateDeviceList('lobbyCamDevices', this.videoInputDevices, this.currentVideoDevice, async (deviceId) => {
             this.currentVideoDevice = deviceId;
-            await this.updateLocalStream();
+            await this.updateVideoStream();
         });
         
         // Update meeting device lists
         this.populateDeviceList('meetingMicDevices', this.audioInputDevices, this.currentAudioDevice, async (deviceId) => {
             this.currentAudioDevice = deviceId;
-            await this.updateLocalStream();
+            await this.updateAudioStream();
         });
         
         this.populateDeviceList('meetingCamDevices', this.videoInputDevices, this.currentVideoDevice, async (deviceId) => {
             this.currentVideoDevice = deviceId;
-            await this.updateLocalStream();
+            await this.updateVideoStream();
         });
     }
     
@@ -215,7 +219,7 @@ class MetachatMeeting {
         this.updateUIButtonStates('lobby');
         
         // Initialize with microphone only (camera off by default)
-        this.updateLocalStream();
+        this.updateAudioStream();
     }
     
     setupMediaControls(prefix) {
@@ -290,7 +294,7 @@ class MetachatMeeting {
                 micImg.src = 'icons/mic-off.png';
             }
             
-            await this.updateLocalStream();
+            await this.updateAudioStream();
             
             // Update local participant tile if in meeting
             if (this.isInMeeting) {
@@ -371,7 +375,7 @@ class MetachatMeeting {
             this.isCamOn = newCamState;
             
             // Update stream
-            await this.updateLocalStream();
+            await this.updateVideoStream();
             
         } catch (error) {
             console.error('Error toggling camera:', error);
@@ -404,8 +408,8 @@ class MetachatMeeting {
                 this.isScreenSharing = true;
                 this.updateScreenShareButton();
                 
-                // Replace video track in all peer connections
-                this.replaceVideoTrack(this.screenStream.getVideoTracks()[0]);
+                // Update combined stream with screen sharing
+                this.updateCombinedStream();
                 
                 // Update local participant tile
                 this.updateLocalParticipantTile();
@@ -432,15 +436,8 @@ class MetachatMeeting {
         this.isScreenSharing = false;
         this.updateScreenShareButton();
         
-        // Replace with camera track if camera is on
-        if (this.isCamOn && this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                this.replaceVideoTrack(videoTrack);
-            }
-        } else {
-            this.replaceVideoTrack(null);
-        }
+        // Update combined stream
+        this.updateCombinedStream();
         
         // Update local participant tile
         this.updateLocalParticipantTile();
@@ -459,26 +456,10 @@ class MetachatMeeting {
         }
     }
     
-    async replaceVideoTrack(newTrack) {
-        for (const [peerId, peer] of this.peers) {
-            try {
-                const sender = peer.peerConnection.getSenders().find(s => 
-                    s.track && s.track.kind === 'video'
-                );
-                
-                if (sender) {
-                    await sender.replaceTrack(newTrack);
-                }
-            } catch (error) {
-                console.error('Error replacing video track for peer:', peerId, error);
-            }
-        }
-    }
-    
     updateLocalVideoDisplay() {
         if (this.localVideo) {
-            if (this.isCamOn && this.localStream) {
-                this.localVideo.srcObject = this.localStream;
+            if (this.isCamOn && this.videoStream) {
+                this.localVideo.srcObject = this.videoStream;
                 this.localVideo.style.display = 'block';
                 this.localVideo.parentElement.style.background = '';
             } else {
@@ -489,62 +470,144 @@ class MetachatMeeting {
         }
     }
     
-    async updateLocalStream() {
+    async updateAudioStream() {
         try {
-            console.log(`Updating local stream - Mic: ${this.isMicOn}, Camera: ${this.isCamOn}`);
+            console.log(`Updating audio stream - Mic: ${this.isMicOn}`);
             
-            // Stop existing stream tracks carefully
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => {
+            // Stop existing audio stream
+            if (this.audioStream) {
+                this.audioStream.getTracks().forEach(track => {
                     track.stop();
-                    console.log(`Stopped ${track.kind} track`);
+                    console.log('Stopped audio track');
                 });
-                this.localStream = null;
+                this.audioStream = null;
             }
             
-            // Build constraints based on current state
-            const constraints = {};
-            
-            // Audio constraints
+            // Create new audio stream if microphone is on
             if (this.isMicOn) {
-                constraints.audio = {
-                    deviceId: this.currentAudioDevice ? { exact: this.currentAudioDevice } : undefined
+                const audioConstraints = {
+                    audio: {
+                        deviceId: this.currentAudioDevice ? { exact: this.currentAudioDevice } : undefined
+                    }
                 };
-            } else {
-                constraints.audio = false;
+                
+                this.audioStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+                console.log('Got new audio stream');
             }
             
-            // Video constraints
-            if (this.isCamOn) {
-                constraints.video = {
-                    deviceId: this.currentVideoDevice ? { exact: this.currentVideoDevice } : undefined,
-                    width: { ideal: 480 },
-                    height: { ideal: 360 }
-                };
-            } else {
-                constraints.video = false;
-            }
-            
-            console.log('Getting user media with constraints:', constraints);
-            
-            // Get new stream only if we need audio or video
-            if (constraints.audio || constraints.video) {
-                this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-                console.log('Got new stream with tracks:', this.localStream.getTracks().map(t => t.kind));
-            }
-            
-            // Update local video display
-            this.updateLocalVideoDisplay();
-            
-            // Update local participant tile if in meeting
-            if (this.isInMeeting) {
-                this.updateLocalParticipantTile();
-            }
+            // Update combined stream
+            this.updateCombinedStream();
             
         } catch (error) {
-            console.error('Error updating local stream:', error);
-            // Ensure video display is updated even on error
-            this.updateLocalVideoDisplay();
+            console.error('Error updating audio stream:', error);
+        }
+    }
+    
+    async updateVideoStream() {
+        try {
+            console.log(`Updating video stream - Camera: ${this.isCamOn}`);
+            
+            // Stop existing video stream
+            if (this.videoStream) {
+                this.videoStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('Stopped video track');
+                });
+                this.videoStream = null;
+            }
+            
+            // Create new video stream if camera is on
+            if (this.isCamOn) {
+                const videoConstraints = {
+                    video: {
+                        deviceId: this.currentVideoDevice ? { exact: this.currentVideoDevice } : undefined,
+                        width: { ideal: 480 },
+                        height: { ideal: 360 }
+                    }
+                };
+                
+                this.videoStream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+                console.log('Got new video stream');
+            }
+            
+            // Update combined stream
+            this.updateCombinedStream();
+            
+        } catch (error) {
+            console.error('Error updating video stream:', error);
+        }
+    }
+    
+    updateCombinedStream() {
+        // Create a new MediaStream combining audio and video tracks
+        const tracks = [];
+        
+        if (this.audioStream) {
+            tracks.push(...this.audioStream.getAudioTracks());
+        }
+        
+        if (this.videoStream && !this.isScreenSharing) {
+            tracks.push(...this.videoStream.getVideoTracks());
+        } else if (this.screenStream && this.isScreenSharing) {
+            tracks.push(...this.screenStream.getVideoTracks());
+        }
+        
+        // Create new combined stream
+        this.localStream = new MediaStream(tracks);
+        
+        console.log('Combined stream tracks:', this.localStream.getTracks().map(t => t.kind));
+        
+        // Update local video display
+        this.updateLocalVideoDisplay();
+        
+        // Update local participant tile if in meeting
+        if (this.isInMeeting) {
+            this.updateLocalParticipantTile();
+        }
+        
+        // Update peer connections when stream composition changes
+        if (this.isInMeeting && this.peers.size > 0) {
+            this.notifyStreamUpdate();
+        }
+    }
+    
+    updatePeerConnections() {
+        console.log('Updating peer connections with new stream composition');
+        
+        if (this.peers.size === 0) {
+            console.log('No peer connections to update');
+            return;
+        }
+        
+        const currentTracks = this.localStream ? this.localStream.getTracks() : [];
+        console.log('Updating peers with tracks:', currentTracks.map(t => `${t.kind}:${t.enabled}`));
+        
+        // For each peer, we need to force a renegotiation
+        for (const [peerId, peer] of this.peers) {
+            try {
+                // The most reliable way with Simple-peer is to recreate the connection
+                // but we'll do it more gracefully
+                console.log(`Updating stream for peer ${peerId}`);
+                
+                // Store the current peer info
+                const participant = this.participants.get(peerId);
+                const userName = participant ? participant.userName : 'Unknown';
+                
+                // Destroy the old peer
+                peer.destroy();
+                this.peers.delete(peerId);
+                
+                // Create new peer connection with updated stream
+                setTimeout(() => {
+                    if (!this.peers.has(peerId)) { // Only if not recreated yet
+                        console.log(`Recreating peer connection for ${peerId} with new stream`);
+                        this.connectToPeer(peerId, userName, true); // We initiate
+                    }
+                }, 50); // Small delay to ensure cleanup
+                
+            } catch (error) {
+                console.error('Error updating peer connection:', peerId, error);
+            }
         }
     }
     
@@ -754,10 +817,81 @@ class MetachatMeeting {
             console.log('User left:', id);
             this.removePeer(id);
         });
+        
+        this.socket.on('user-stream-updated', ({ id, userName }) => {
+            console.log('User stream updated:', id, userName);
+            this.handleUserStreamUpdate(id, userName);
+        });
+    }
+    
+    notifyStreamUpdate() {
+        console.log('Notifying server of stream update');
+        if (this.socket) {
+            this.socket.emit('stream-update', {
+                roomId: this.meetId,
+                userName: this.userName
+            });
+        }
+        
+        // After notifying, recreate our own connections as initiator
+        setTimeout(() => {
+            this.recreateAllConnections();
+        }, 150);
+    }
+    
+    recreateAllConnections() {
+        console.log('Recreating all peer connections with new stream');
+        
+        const peersToRecreate = [];
+        for (const [peerId, peer] of this.peers) {
+            const participant = this.participants.get(peerId);
+            peersToRecreate.push({
+                peerId,
+                userName: participant ? participant.userName : 'Unknown'
+            });
+            
+            // Destroy old connection
+            peer.destroy();
+        }
+        
+        this.peers.clear();
+        
+        // Recreate as initiator
+        for (const { peerId, userName } of peersToRecreate) {
+            console.log(`Recreating connection to ${userName} (${peerId}) as initiator`);
+            this.connectToPeer(peerId, userName, true);
+        }
+    }
+    
+    handleUserStreamUpdate(peerId, userName) {
+        console.log(`Handling stream update from ${userName} (${peerId})`);
+        
+        // Remove the old peer connection
+        const peer = this.peers.get(peerId);
+        if (peer) {
+            peer.destroy();
+            this.peers.delete(peerId);
+        }
+        
+        // Wait a moment then reconnect as receiver (the updater will be initiator)
+        setTimeout(() => {
+            if (!this.peers.has(peerId)) {
+                console.log(`Reconnecting to ${peerId} after stream update`);
+                this.connectToPeer(peerId, userName, false); // We are receiver
+            }
+        }, 100);
     }
     
     connectToPeer(peerId, userName, isInitiator) {
         console.log(`Connecting to peer ${peerId} (${userName}) as ${isInitiator ? 'initiator' : 'receiver'}`);
+        
+        // Make sure we have a current stream
+        if (!this.localStream) {
+            console.log('No local stream available, creating empty stream');
+            this.localStream = new MediaStream();
+        }
+        
+        console.log('Connecting with stream tracks:', this.localStream.getTracks().map(t => `${t.kind}:${t.enabled}`));
         
         const peer = new SimplePeer({
             initiator: isInitiator,
@@ -787,31 +921,67 @@ class MetachatMeeting {
         });
         
         peer.on('stream', (stream) => {
-            console.log('Received stream from peer:', peerId);
+            console.log('Received stream from peer:', peerId, {
+                audioTracks: stream.getAudioTracks().length,
+                videoTracks: stream.getVideoTracks().length,
+                audioEnabled: stream.getAudioTracks().length > 0 ? stream.getAudioTracks()[0].enabled : false,
+                videoEnabled: stream.getVideoTracks().length > 0 ? stream.getVideoTracks()[0].enabled : false
+            });
             this.addParticipant(peerId, userName, stream);
         });
         
         peer.on('error', (error) => {
             console.error('Peer error:', error);
+            // Clean up on error
+            this.peers.delete(peerId);
         });
         
         // Store peer info
         this.peers.set(peerId, peer);
         this.participants.set(peerId, { userName, stream: null });
         
-        // Add placeholder participant tile
-        this.addParticipant(peerId, userName, null);
+        // Add placeholder participant tile if no stream yet
+        if (!isInitiator) {
+            this.addParticipant(peerId, userName, null);
+        }
     }
     
     handleSignalReceived(signal, callerID) {
-        if (!this.peers.has(callerID)) {
-            // This is a new connection
+        console.log('Received signal from:', callerID);
+        
+        // Check if the peer still exists and is not destroyed
+        const peer = this.peers.get(callerID);
+        if (!peer) {
+            console.log(`No peer found for ${callerID}, creating new connection`);
             this.connectToPeer(callerID, 'Unknown', false);
+            // Wait for the new peer to be created before signaling
+            setTimeout(() => {
+                const newPeer = this.peers.get(callerID);
+                if (newPeer && !newPeer.destroyed) {
+                    try {
+                        newPeer.signal(signal);
+                    } catch (error) {
+                        console.error('Error signaling new peer:', error);
+                    }
+                }
+            }, 50);
+            return;
         }
         
-        const peer = this.peers.get(callerID);
-        if (peer) {
+        if (peer.destroyed) {
+            console.log(`Peer ${callerID} is destroyed, ignoring signal`);
+            return;
+        }
+        
+        try {
             peer.signal(signal);
+        } catch (error) {
+            console.error('Error handling signal from', callerID, ':', error);
+            if (error.message.includes('destroyed') || error.message.includes('closed')) {
+                console.log(`Cleaning up destroyed peer ${callerID}`);
+                this.peers.delete(callerID);
+                // Don't recreate here, let the other side initiate
+            }
         }
     }
     
@@ -829,14 +999,27 @@ class MetachatMeeting {
         tile.className = 'participant-tile';
         tile.id = `participant-${peerId}`;
         
-        if (stream && stream.getVideoTracks().length > 0) {
-            // Video available
+        // Always create audio element for remote participants (not muted)
+        if (stream && stream.getAudioTracks().length > 0) {
+            const audio = document.createElement('audio');
+            audio.srcObject = stream;
+            audio.autoplay = true;
+            audio.style.display = 'none'; // Hidden but playing
+            tile.appendChild(audio);
+            console.log(`Added audio stream for participant ${userName}`);
+        }
+        
+        // Handle video display
+        const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+        
+        if (hasVideo) {
+            // Video available - show video stream
             const video = document.createElement('video');
             video.className = 'participant-video';
             video.srcObject = stream;
             video.autoplay = true;
             video.playsInline = true;
-            video.muted = true;
+            video.muted = true; // Mute video element since we have separate audio element
             tile.appendChild(video);
             
             // Name overlay
@@ -845,14 +1028,14 @@ class MetachatMeeting {
             nameOverlay.textContent = userName;
             tile.appendChild(nameOverlay);
         } else {
-            // No video - show name
+            // No video - show name only
             const nameDiv = document.createElement('div');
             nameDiv.className = 'participant-name-large';
             nameDiv.textContent = userName;
             tile.appendChild(nameDiv);
         }
         
-        // Muted indicator
+        // Muted indicator for audio
         if (stream && stream.getAudioTracks().length > 0) {
             const audioTrack = stream.getAudioTracks()[0];
             if (!audioTrack.enabled) {
@@ -861,6 +1044,12 @@ class MetachatMeeting {
                 mutedIndicator.innerHTML = '<img src="icons/mic-off.png" alt="Muted">';
                 tile.appendChild(mutedIndicator);
             }
+        } else if (!stream || stream.getAudioTracks().length === 0) {
+            // No audio stream at all
+            const mutedIndicator = document.createElement('div');
+            mutedIndicator.className = 'participant-muted';
+            mutedIndicator.innerHTML = '<img src="icons/mic-off.png" alt="Muted">';
+            tile.appendChild(mutedIndicator);
         }
         
         // Click handler for fullscreen
@@ -973,6 +1162,13 @@ class MetachatMeeting {
             
             const videoElement = fullscreenVideo.querySelector('.fullscreen-video-element');
             videoElement.srcObject = stream;
+            
+            // Don't mute fullscreen video - we want to hear audio
+            if (peerId === 'local') {
+                videoElement.muted = true; // Keep local video muted to prevent feedback
+            } else {
+                videoElement.muted = false; // Allow audio from remote participants
+            }
             
             const nameElement = fullscreenVideo.querySelector('.participant-name');
             

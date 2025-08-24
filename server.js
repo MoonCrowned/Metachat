@@ -149,6 +149,17 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Handle stream updates
+    socket.on('stream-update', ({ roomId, userName }) => {
+        console.log(`${userName} (${socket.id}) updated their stream in room ${roomId}`);
+        
+        // Notify all other users in the room about the stream update
+        socket.to(roomId).emit('user-stream-updated', {
+            id: socket.id,
+            userName: userName
+        });
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
