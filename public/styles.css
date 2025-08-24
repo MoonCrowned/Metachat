@@ -1,0 +1,497 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a1a;
+    color: white;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Main page styles */
+.newmeet-page {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.main-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+}
+
+.center-content {
+    text-align: center;
+}
+
+.center-content h1 {
+    font-size: 3rem;
+    margin-bottom: 2rem;
+    font-weight: 300;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.create-meeting-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    font-size: 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.create-meeting-btn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+/* Meeting page base */
+.meet-page {
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Not found screen */
+.not-found-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.not-found-screen h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    font-weight: 300;
+}
+
+/* Lobby screen */
+.lobby-screen {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+}
+
+.local-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #90EE90;
+}
+
+.lobby-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.lobby-top {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 2rem;
+}
+
+.name-input-container {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+#nameInput {
+    width: 300px;
+    padding: 12px 16px;
+    font-size: 1.1rem;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    background: white;
+    color: #333;
+}
+
+#nameInput:focus {
+    outline: none;
+    border-color: #4caf50;
+}
+
+.join-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.join-btn:hover {
+    background: #45a049;
+}
+
+.lobby-bottom {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 2rem;
+}
+
+/* Meeting screen */
+.meeting-screen {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    background: #1a1a1a;
+}
+
+.participants-grid {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+    height: calc(100vh - 80px);
+    width: 100vw;
+}
+
+/* Dynamic grid sizing */
+.participants-grid.grid-1 {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+.participants-grid.grid-2 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+.participants-grid.grid-3,
+.participants-grid.grid-4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.participants-grid.grid-5,
+.participants-grid.grid-6 {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.participants-grid.grid-7,
+.participants-grid.grid-8,
+.participants-grid.grid-9 {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+}
+
+.participant-tile {
+    position: relative;
+    background: #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.participant-tile:hover {
+    transform: scale(1.02);
+}
+
+.participant-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.participant-name-overlay {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    backdrop-filter: blur(5px);
+}
+
+.participant-name-large {
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: #ccc;
+}
+
+.participant-muted {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 0, 0, 0.8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.participant-muted img {
+    width: 16px;
+    height: 16px;
+}
+
+/* Fullscreen video */
+.fullscreen-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: #000;
+    z-index: 10;
+}
+
+.fullscreen-video-element {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.fullscreen-video .participant-name {
+    position: absolute;
+    bottom: 100px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    backdrop-filter: blur(10px);
+}
+
+/* Controls panel */
+.controls-panel {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 12px 20px;
+    border-radius: 50px;
+    backdrop-filter: blur(10px);
+}
+
+.control-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.control-btn {
+    width: 50px;
+    height: 50px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #404040;
+}
+
+.control-btn:hover {
+    transform: scale(1.1);
+}
+
+.control-btn img {
+    width: 24px;
+    height: 24px;
+}
+
+.control-btn.mic-on {
+    background: #4caf50;
+}
+
+.control-btn.mic-off {
+    background: #f44336;
+}
+
+.control-btn.cam-on {
+    background: #4caf50;
+}
+
+.control-btn.cam-off {
+    background: #f44336;
+}
+
+.control-btn.screen-on {
+    background: #2196f3;
+}
+
+.control-btn.screen-off {
+    background: #404040;
+}
+
+.control-btn.leave-btn {
+    background: #f44336;
+}
+
+.device-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: #606060;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.device-btn:hover {
+    background: #707070;
+}
+
+.device-btn img {
+    width: 16px;
+    height: 16px;
+}
+
+.device-list {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 8px;
+    padding: 8px;
+    min-width: 200px;
+    backdrop-filter: blur(10px);
+    border: 1px solid #444;
+}
+
+.device-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.device-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.device-item.selected {
+    background: #4caf50;
+}
+
+/* Meeting controls positioning */
+.meeting-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .center-content h1 {
+        font-size: 2rem;
+    }
+    
+    .create-meeting-btn {
+        padding: 14px 28px;
+        font-size: 1rem;
+    }
+    
+    #nameInput {
+        width: 250px;
+    }
+    
+    .control-btn {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .control-btn img {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .controls-panel {
+        gap: 8px;
+        padding: 10px 16px;
+    }
+    
+    .participants-grid {
+        padding: 4px;
+        gap: 4px;
+    }
+    
+    .participant-name-overlay {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .name-input-container {
+        padding: 1rem;
+        margin: 0 1rem;
+    }
+    
+    #nameInput {
+        width: 200px;
+        font-size: 1rem;
+    }
+    
+    .control-btn {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .control-btn img {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .device-btn {
+        width: 25px;
+        height: 25px;
+    }
+    
+    .device-btn img {
+        width: 14px;
+        height: 14px;
+    }
+}

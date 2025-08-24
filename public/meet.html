@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metachat - Meeting</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="meet-page">
+    <!-- Meeting not found screen -->
+    <div id="notFoundScreen" class="not-found-screen hidden">
+        <div class="center-content">
+            <h2>Встреча не найдена</h2>
+            <button id="createNewMeetingBtn" class="create-meeting-btn">
+                Создать новую встречу
+            </button>
+        </div>
+    </div>
+
+    <!-- Lobby screen -->
+    <div id="lobbyScreen" class="lobby-screen hidden">
+        <video id="localPreview" class="local-preview" autoplay muted playsinline></video>
+        <div class="lobby-overlay">
+            <div class="lobby-top">
+                <div class="name-input-container">
+                    <input type="text" id="nameInput" placeholder="Ваше имя" value="Metabro">
+                    <button id="joinMeetingBtn" class="join-btn">Присоединиться</button>
+                </div>
+            </div>
+            <div class="lobby-bottom">
+                <div class="controls-panel">
+                    <div class="control-group">
+                        <button id="lobbyMicBtn" class="control-btn mic-off">
+                            <img src="icons/mic-off.png" alt="Микрофон">
+                        </button>
+                        <button id="lobbyMicDeviceBtn" class="device-btn">
+                            <img src="icons/devices.png" alt="Выбрать микрофон">
+                        </button>
+                        <div id="lobbyMicDevices" class="device-list hidden"></div>
+                    </div>
+                    <div class="control-group">
+                        <button id="lobbyCamBtn" class="control-btn cam-off">
+                            <img src="icons/cam-off.png" alt="Камера">
+                        </button>
+                        <button id="lobbyCamDeviceBtn" class="device-btn">
+                            <img src="icons/devices.png" alt="Выбрать камеру">
+                        </button>
+                        <div id="lobbyCamDevices" class="device-list hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meeting room screen -->
+    <div id="meetingScreen" class="meeting-screen hidden">
+        <div id="participantsGrid" class="participants-grid"></div>
+        <div id="fullscreenVideo" class="fullscreen-video hidden">
+            <video class="fullscreen-video-element" autoplay playsinline></video>
+            <div class="participant-name"></div>
+        </div>
+        <div class="meeting-controls">
+            <div class="controls-panel">
+                <div class="control-group">
+                    <button id="meetingMicBtn" class="control-btn mic-on">
+                        <img src="icons/mic-on.png" alt="Микрофон">
+                    </button>
+                    <button id="meetingMicDeviceBtn" class="device-btn">
+                        <img src="icons/devices.png" alt="Выбрать микрофон">
+                    </button>
+                    <div id="meetingMicDevices" class="device-list hidden"></div>
+                </div>
+                <div class="control-group">
+                    <button id="meetingCamBtn" class="control-btn cam-off">
+                        <img src="icons/cam-off.png" alt="Камера">
+                    </button>
+                    <button id="meetingCamDeviceBtn" class="device-btn">
+                        <img src="icons/devices.png" alt="Выбрать камеру">
+                    </button>
+                    <div id="meetingCamDevices" class="device-list hidden"></div>
+                </div>
+                <div class="control-group">
+                    <button id="screenShareBtn" class="control-btn screen-off">
+                        <img src="icons/screen-off.png" alt="Демонстрация экрана">
+                    </button>
+                </div>
+                <div class="control-group">
+                    <button id="leaveMeetingBtn" class="control-btn leave-btn">
+                        <img src="icons/leave.png" alt="Завершить звонок">
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
+    <script src="meet.js"></script>
+</body>
+</html>
