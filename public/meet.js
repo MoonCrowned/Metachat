@@ -418,7 +418,7 @@ class MetachatMeeting {
                 this.updateScreenShareButton();
                 
                 // Update video tracks with screen sharing
-                this.updateVideoTracks();
+                this.sendVideoStreamToPeers();
                 
                 // Update local participant tile
                 this.updateLocalParticipantTile();
@@ -446,7 +446,7 @@ class MetachatMeeting {
         this.updateScreenShareButton();
         
         // Update video tracks
-        this.updateVideoTracks();
+        this.sendVideoStreamToPeers();
         
         // Update local participant tile
         this.updateLocalParticipantTile();
@@ -504,8 +504,8 @@ class MetachatMeeting {
                 console.log('Got new audio stream');
             }
             
-            // Update peer connections with new audio track
-            this.updateAudioTracks();
+            // Update peer connections with new audio stream
+            this.sendAudioStreamToPeers();
             
             // Update local video display
             this.updateLocalVideoDisplay();
@@ -547,8 +547,8 @@ class MetachatMeeting {
                 console.log('Got new video stream');
             }
             
-            // Update peer connections with new video track
-            this.updateVideoTracks();
+            // Update peer connections with new video stream
+            this.sendVideoStreamToPeers();
             
             // Update local video display
             this.updateLocalVideoDisplay();
@@ -563,74 +563,54 @@ class MetachatMeeting {
         }
     }
     
-    updateAudioTracks() {
-        console.log('Updating audio tracks in peer connections');
-        
-        if (this.peers.size === 0) {
-            console.log('No peer connections to update');
-            return;
-        }
-        
-        const newAudioTrack = this.audioStream ? this.audioStream.getAudioTracks()[0] : null;
-        console.log('New audio track:', newAudioTrack ? 'available' : 'none');
-        
-        for (const [peerId, peer] of this.peers) {
-            try {
-                const pc = peer._pc || peer.peerConnection;
-                if (!pc) continue;
-                
-                const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
-                
-                if (audioSender) {
-                    console.log(`Replacing audio track for peer ${peerId}`);
-                    audioSender.replaceTrack(newAudioTrack);
-                } else if (newAudioTrack) {
-                    console.log(`Adding audio track for peer ${peerId}`);
-                    pc.addTrack(newAudioTrack);
-                }
-                
-            } catch (error) {
-                console.error(`Error updating audio track for peer ${peerId}:`, error);
-            }
-        }
+    sendAudioStreamToPeers() {
+        this.updatePeerConnectionsWithNewStreams('audio');
     }
     
-    updateVideoTracks() {
-        console.log('Updating video tracks in peer connections');
-        
+    sendVideoStreamToPeers() {
+        this.updatePeerConnectionsWithNewStreams('video');
+    }
+    
+    updatePeerConnectionsWithNewStreams(changedStreamType) {
         if (this.peers.size === 0) {
             console.log('No peer connections to update');
             return;
         }
         
-        let newVideoTrack = null;
-        if (this.isScreenSharing && this.screenStream) {
-            newVideoTrack = this.screenStream.getVideoTracks()[0];
-        } else if (this.videoStream) {
-            newVideoTrack = this.videoStream.getVideoTracks()[0];
-        }
+        console.log(`Updating peer connections due to ${changedStreamType} stream change`);
         
-        console.log('New video track:', newVideoTrack ? (this.isScreenSharing ? 'screen' : 'camera') : 'none');
+        // Notify server about stream update so all participants can coordinate reconnection
+        this.socket.emit('stream-update', {
+            roomId: this.meetId,
+            streamType: changedStreamType,
+            enabled: changedStreamType === 'audio' ? this.isMicOn : this.isCamOn
+        });
+        
+        // Store current peer info for recreation
+        const peersToRecreate = new Map();
         
         for (const [peerId, peer] of this.peers) {
-            try {
-                const pc = peer._pc || peer.peerConnection;
-                if (!pc) continue;
-                
-                const videoSender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                
-                if (videoSender) {
-                    console.log(`Replacing video track for peer ${peerId}`);
-                    videoSender.replaceTrack(newVideoTrack);
-                } else if (newVideoTrack) {
-                    console.log(`Adding video track for peer ${peerId}`);
-                    pc.addTrack(newVideoTrack);
-                }
-                
-            } catch (error) {
-                console.error(`Error updating video track for peer ${peerId}:`, error);
+            const participant = this.participants.get(peerId);
+            if (participant) {
+                peersToRecreate.set(peerId, {
+                    userName: participant.userName
+                });
             }
+            
+            // Destroy old peer
+            peer.destroy();
         }
+        
+        // Clear current peers
+        this.peers.clear();
+        
+        // Wait a bit for all participants to destroy their connections
+        setTimeout(() => {
+            for (const [peerId, info] of peersToRecreate) {
+                console.log(`Recreating connection to ${peerId} with updated streams`);
+                this.connectToPeer(peerId, info.userName, true); // Always be initiator for stream updates
+            }
+        }, 150); // Longer delay to ensure coordination
     }
     
 
@@ -840,38 +820,57 @@ class MetachatMeeting {
             console.log('User left:', id);
             this.removePeer(id);
         });
+        
+        this.socket.on('stream-update-notification', ({ fromUserId, streamType, enabled }) => {
+            console.log(`Received stream update notification from ${fromUserId}: ${streamType} ${enabled ? 'enabled' : 'disabled'}`);
+            
+            // Other participant has updated their stream, we need to prepare for reconnection
+            const peer = this.peers.get(fromUserId);
+            if (peer) {
+                const participant = this.participants.get(fromUserId);
+                console.log(`Preparing for reconnection with ${fromUserId}`);
+                
+                // Destroy our side of the connection
+                peer.destroy();
+                this.peers.delete(fromUserId);
+                
+                // Wait a bit, then prepare to receive new connection
+                setTimeout(() => {
+                    console.log(`Ready to receive new connection from ${fromUserId}`);
+                    // The other side will initiate the new connection
+                }, 100);
+            }
+        });
     }
     
     connectToPeer(peerId, userName, isInitiator) {
         console.log(`Connecting to peer ${peerId} (${userName}) as ${isInitiator ? 'initiator' : 'receiver'}`);
         
-        // Create combined stream for peer connection initialization
-        const combinedStream = new MediaStream();
+        // Create initial stream with current audio and video
+        const initialStream = new MediaStream();
         
-        // Add available tracks to combined stream
-        if (this.audioStream) {
-            this.audioStream.getAudioTracks().forEach(track => {
-                combinedStream.addTrack(track);
-            });
-        }
-        if (this.videoStream) {
-            this.videoStream.getVideoTracks().forEach(track => {
-                combinedStream.addTrack(track);
-            });
-        }
-        if (this.isScreenSharing && this.screenStream) {
-            this.screenStream.getVideoTracks().forEach(track => {
-                combinedStream.addTrack(track);
-            });
+        // Add current audio track if available
+        if (this.audioStream && this.audioStream.getAudioTracks().length > 0) {
+            initialStream.addTrack(this.audioStream.getAudioTracks()[0]);
+            console.log('Added audio track to initial stream');
         }
         
-        console.log('Connecting with stream tracks:', combinedStream.getTracks().map(t => `${t.kind}:${t.enabled}`));
+        // Add current video track if available
+        if (this.isScreenSharing && this.screenStream && this.screenStream.getVideoTracks().length > 0) {
+            initialStream.addTrack(this.screenStream.getVideoTracks()[0]);
+            console.log('Added screen track to initial stream');
+        } else if (this.videoStream && this.videoStream.getVideoTracks().length > 0) {
+            initialStream.addTrack(this.videoStream.getVideoTracks()[0]);
+            console.log('Added video track to initial stream');
+        }
+        
+        console.log('Connecting with initial stream tracks:', initialStream.getTracks().map(t => `${t.kind}:${t.enabled}`));
         
         const peer = new SimplePeer({
             initiator: isInitiator,
             trickle: false,
             config: this.peerConfig,
-            stream: combinedStream
+            stream: initialStream
         });
         
         peer.on('signal', (signal) => {
