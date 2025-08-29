@@ -7,7 +7,7 @@ class MetachatMeeting {
         this.localVideo = null;
         this.peers = new Map(); // Map of peer connections
         this.participants = new Map(); // Map of participant info
-        this.userName = 'Metabro';
+        this.userName = '';
         this.isInMeeting = false;
         this.isFullscreen = false;
         this.fullscreenPeerId = null;
@@ -202,13 +202,31 @@ class MetachatMeeting {
     async setupLobbyEvents() {
         // Name input
         const nameInput = document.getElementById('nameInput');
+        const joinBtn = document.getElementById('joinMeetingBtn');
+        
+        // Focus the input field
+        nameInput.focus();
+        
+        // Disable join button initially
+        this.updateJoinButtonState();
+        
         nameInput.addEventListener('input', (e) => {
-            this.userName = e.target.value || 'Metabro';
+            this.userName = e.target.value.trim();
+            this.updateJoinButtonState();
         });
         
         // Join meeting button
-        document.getElementById('joinMeetingBtn').addEventListener('click', () => {
-            this.joinMeeting();
+        joinBtn.addEventListener('click', () => {
+            if (this.userName.length >= 3) {
+                this.joinMeeting();
+            }
+        });
+        
+        // Allow Enter key to join if valid
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && this.userName.length >= 3) {
+                this.joinMeeting();
+            }
         });
         
         // Media controls in lobby
@@ -219,6 +237,19 @@ class MetachatMeeting {
         
         // Initialize with microphone only (camera off by default)
         this.updateAudioStream();
+    }
+    
+    updateJoinButtonState() {
+        const joinBtn = document.getElementById('joinMeetingBtn');
+        const isValid = this.userName.length >= 3;
+        
+        joinBtn.disabled = !isValid;
+        
+        if (isValid) {
+            joinBtn.className = 'join-btn';
+        } else {
+            joinBtn.className = 'join-btn disabled';
+        }
     }
     
     setupMediaControls(prefix) {
@@ -595,13 +626,14 @@ class MetachatMeeting {
                 peersToRecreate.set(peerId, {
                     userName: participant.userName
                 });
+                console.log(`Storing participant info for ${peerId}: ${participant.userName}`);
             }
             
-            // Destroy old peer
+            // Destroy old peer but keep participant info
             peer.destroy();
         }
         
-        // Clear current peers
+        // Clear current peers but keep participants for name preservation
         this.peers.clear();
         
         // Wait a bit for all participants to destroy their connections
@@ -615,7 +647,13 @@ class MetachatMeeting {
     
 
     async joinMeeting() {
-        this.userName = document.getElementById('nameInput').value || 'Metabro';
+        // Validate username length
+        const trimmedName = document.getElementById('nameInput').value.trim();
+        if (trimmedName.length < 3) {
+            return; // Don't join if invalid
+        }
+        
+        this.userName = trimmedName;
         
         // Setup meeting controls
         this.setupMediaControls('meeting');
@@ -830,9 +868,10 @@ class MetachatMeeting {
                 const participant = this.participants.get(fromUserId);
                 console.log(`Preparing for reconnection with ${fromUserId}`);
                 
-                // Destroy our side of the connection
+                // Destroy our side of the connection but keep participant info
                 peer.destroy();
                 this.peers.delete(fromUserId);
+                // Note: We keep the participant in this.participants map to preserve the userName
                 
                 // Wait a bit, then prepare to receive new connection
                 setTimeout(() => {
@@ -926,7 +965,16 @@ class MetachatMeeting {
         const peer = this.peers.get(callerID);
         if (!peer) {
             console.log(`No peer found for ${callerID}, creating new connection`);
-            this.connectToPeer(callerID, 'Unknown', false);
+            
+            // Try to get the participant name from our stored participants
+            let userName = 'Unknown';
+            const participant = this.participants.get(callerID);
+            if (participant && participant.userName) {
+                userName = participant.userName;
+                console.log(`Found stored participant name: ${userName}`);
+            }
+            
+            this.connectToPeer(callerID, userName, false);
             // Wait for the new peer to be created before signaling
             setTimeout(() => {
                 const newPeer = this.peers.get(callerID);
