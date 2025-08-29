@@ -149,6 +149,18 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Handle stream updates for coordination
+    socket.on('stream-update', ({ roomId, streamType, enabled }) => {
+        console.log(`${socket.userName} updated ${streamType} stream: ${enabled ? 'enabled' : 'disabled'}`);
+        
+        // Notify other participants in the room about the stream update
+        socket.to(roomId).emit('stream-update-notification', {
+            fromUserId: socket.id,
+            streamType,
+            enabled
+        });
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
